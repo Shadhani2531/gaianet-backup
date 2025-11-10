@@ -1,184 +1,117 @@
-from flask import Flask, jsonify, request  # Fixed: added 'request'
+from flask import Flask, jsonify
 from flask_cors import CORS
-import random
-from datetime import datetime, timedelta
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-class NasaApiService:
-    def __init__(self):
-        pass
-    
-    def get_earth_imagery(self, lat=None, lon=None, date=None):
-        """Get Earth imagery data - mock implementation"""
-        if not date:
-            date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-            
-        return {
-            "source": "MODIS Terra",
-            "date": date,
-            "resolution": "250m",
-            "bands": ["true_color", "vegetation", "temperature"],
-            "image_url": f"https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&CRS=EPSG:4326&WIDTH=512&HEIGHT=512&BBOX=-180,-90,180,90&FORMAT=image/jpeg&TIME={date}"
-        }
-    
-    def get_climate_data(self, lat=0, lon=0):
-        """Get climate data - mock implementation"""
-        # Simple climate simulation based on coordinates
-        base_temp = 25 - abs(lat) * 0.6  # Temperature decreases with latitude
-        
-        return {
-            "temperature_2m": round(base_temp + (lon * 0.01), 1),
-            "precipitation": round(max(0, 2 + (lat * 0.1)), 1),
-            "surface_pressure": 1013.25,
-            "wind_speed_2m": round(3 + abs(lat) * 0.1, 1),
-            "coordinates": {"lat": lat, "lon": lon},
-            "timestamp": datetime.now().isoformat(),
-            "source": "NASA POWER API"
-        }
-    
-    def get_satellite_imagery_metadata(self):
-        """Get metadata about available satellites"""
-        return {
-            "available_satellites": [
-                {
-                    "name": "MODIS Terra",
-                    "description": "Moderate Resolution Imaging Spectroradiometer on Terra satellite",
-                    "resolution": "250m-1km",
-                    "bands": ["true_color", "false_color", "vegetation", "temperature"],
-                    "update_frequency": "daily"
-                },
-                {
-                    "name": "MODIS Aqua", 
-                    "description": "Moderate Resolution Imaging Spectroradiometer on Aqua satellite",
-                    "resolution": "250m-1km",
-                    "bands": ["true_color", "chlorophyll", "sea_surface_temp"],
-                    "update_frequency": "daily"
-                },
-                {
-                    "name": "VIIRS",
-                    "description": "Visible Infrared Imaging Radiometer Suite",
-                    "resolution": "375m-750m", 
-                    "bands": ["true_color", "night_lights", "cloud_cover"],
-                    "update_frequency": "daily"
-                }
-            ],
-            "last_updated": datetime.now().isoformat()
-        }
-
-nasa_service = NasaApiService()
-
 @app.route('/')
 def root():
-    return jsonify({"message": "Welcome to GaiaNet API", "version": "1.0.0"})
-
-@app.route('/health')
-def health():
-    return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
-
-@app.route('/api/environment/data')
-def get_environment_data():
-    # Simulate real environmental data with realistic values
     return jsonify({
-        "temperature": {
-            "value": round(15.2 + random.uniform(-0.5, 0.5), 1),
-            "trend": "up",
-            "change": "+1.2°C"
-        },
-        "co2": {
-            "value": 417 + random.randint(-2, 2),
-            "trend": "up", 
-            "change": 52
-        },
-        "seaLevel": {
-            "value": round(3.2 + random.uniform(-0.2, 0.2), 1),
-            "trend": "up",
-            "change": "+0.8mm"
-        },
-        "forestCover": {
-            "value": round(31.2 + random.uniform(-0.5, 0.5), 1),
-            "trend": "down", 
-            "change": "-2.1%"
-        },
-        "biodiversity": {
-            "value": round(24.7 + random.uniform(-1, 1), 1),
-            "trend": "up",
-            "change": "+1.5%"
-        },
-        "iceCover": {
-            "value": round(12.8 + random.uniform(-1, 1), 1),
-            "trend": "down",
-            "change": "-3.2%"
-        },
-        "airQuality": {
-            "value": 85 + random.randint(-5, 5),
-            "trend": "down",
-            "change": "+5%"
-        }
+        "message": "GaiaNet API Server Running", 
+        "status": "healthy",
+        "version": "1.0.0"
     })
 
-# NEW NASA ENDPOINTS
-@app.route('/api/nasa/imagery')
-def get_nasa_imagery():
-    """Get NASA satellite imagery data"""
-    try:
-        lat = request.args.get('lat', type=float)
-        lon = request.args.get('lon', type=float)
-        date = request.args.get('date')
-        
-        imagery_data = nasa_service.get_earth_imagery(lat, lon, date)
-        return jsonify({
-            "status": "success",
-            "data": imagery_data,
-            "message": "Satellite imagery data retrieved",
-            "timestamp": datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": f"Failed to retrieve imagery: {str(e)}",
-            "timestamp": datetime.now().isoformat()
-        })
+@app.route('/health')
+def health_check():
+    return jsonify({
+        "status": "healthy", 
+        "timestamp": datetime.now().isoformat(),
+        "service": "GaiaNet Backend"
+    })
 
-@app.route('/api/nasa/climate')
-def get_nasa_climate():
-    """Get NASA climate data for specific coordinates"""
-    try:
-        lat = request.args.get('lat', 0, type=float)
-        lon = request.args.get('lon', 0, type=float)
-        
-        climate_data = nasa_service.get_climate_data(lat, lon)
-        return jsonify({
-            "status": "success",
-            "data": climate_data,
-            "message": "Climate data retrieved",
-            "timestamp": datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": f"Failed to retrieve climate data: {str(e)}",
-            "timestamp": datetime.now().isoformat()
-        })
+@app.route('/api/environment/current')
+def get_current_environment():
+    """Get current environmental data"""
+    return jsonify({
+        "temperature": 15.2,
+        "co2_levels": 417.5,
+        "deforestation_rate": 0.08,
+        "biodiversity_index": 0.76,
+        "air_quality": 85.2,
+        "sea_level_rise": 3.4,
+        "timestamp": datetime.now().isoformat()
+    })
 
-@app.route('/api/nasa/satellites')
-def get_satellite_metadata():
-    """Get metadata about available satellites"""
-    try:
-        metadata = nasa_service.get_satellite_imagery_metadata()
-        return jsonify({
-            "status": "success",
-            "data": metadata,
-            "message": "Satellite metadata retrieved",
-            "timestamp": datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": f"Failed to retrieve satellite metadata: {str(e)}",
-            "timestamp": datetime.now().isoformat()
-        })
+@app.route('/api/environment/metrics')
+def get_environment_metrics():
+    """Get environmental metrics with trends"""
+    return jsonify({
+        "metrics": {
+            "global_temperature": {
+                "value": 15.2, 
+                "unit": "°C", 
+                "change": "+1.1",
+                "trend": "rising"
+            },
+            "co2_concentration": {
+                "value": 417.5, 
+                "unit": "ppm", 
+                "change": "+2.5",
+                "trend": "rising"
+            },
+            "sea_level_rise": {
+                "value": 3.4, 
+                "unit": "mm/year", 
+                "change": "+0.3",
+                "trend": "rising"
+            },
+            "forest_cover_loss": {
+                "value": 10.1, 
+                "unit": "M hectares/year", 
+                "change": "-0.2",
+                "trend": "improving"
+            },
+            "biodiversity_index": {
+                "value": 76.0,
+                "unit": "%",
+                "change": "-2.1", 
+                "trend": "declining"
+            }
+        },
+        "last_updated": datetime.now().isoformat()
+    })
+
+@app.route('/api/layers')
+def get_available_layers():
+    """Get available data layers"""
+    return jsonify({
+        "layers": [
+            {"id": "temperature", "name": "Temperature Heatmap", "description": "Global temperature distribution"},
+            {"id": "vegetation", "name": "Vegetation Index", "description": "NDVI vegetation health"},
+            {"id": "co2", "name": "CO2 Concentration", "description": "Atmospheric CO2 levels"},
+            {"id": "deforestation", "name": "Deforestation", "description": "Forest cover changes"},
+            {"id": "night_lights", "name": "Night Lights", "description": "Human activity at night"},
+            {"id": "air_quality", "name": "Air Quality", "description": "PM2.5 and pollution levels"}
+        ]
+    })
+
+@app.route('/api/satellite/imagery')
+def get_satellite_imagery():
+    """Get satellite imagery metadata"""
+    return jsonify({
+        "sources": [
+            {
+                "name": "MODIS Terra",
+                "description": "Moderate Resolution Imaging Spectroradiometer",
+                "resolution": "250m",
+                "update_frequency": "daily"
+            },
+            {
+                "name": "MODIS Aqua", 
+                "description": "Moderate Resolution Imaging Spectroradiometer",
+                "resolution": "250m",
+                "update_frequency": "daily"
+            },
+            {
+                "name": "VIIRS",
+                "description": "Visible Infrared Imaging Radiometer Suite",
+                "resolution": "375m", 
+                "update_frequency": "nightly"
+            }
+        ]
+    })
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8000)
+    app.run(debug=True, host='0.0.0.0', port=8000)

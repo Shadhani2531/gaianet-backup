@@ -1,71 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import random
 from datetime import datetime
+from typing import Dict, Any
 
-# Import our NASA service
-try:
-    from services.nasa_api import NasaApiService
-    nasa_service = NasaApiService()
-except ImportError as e:
-    print(f"NASA service import error: {e}")
-    # Create a mock service if import fails
-    class MockNasaService:
-        async def get_earth_imagery(self, lat=None, lon=None, date=None):
-            return {
-                "source": "MODIS Terra",
-                "date": date or datetime.now().strftime('%Y-%m-%d'),
-                "resolution": "250m",
-                "bands": ["true_color", "vegetation", "temperature"]
-            }
-        
-        async def get_climate_data(self, lat=0, lon=0):
-            return {
-                "temperature_2m": round(15.2 + random.uniform(-5, 5), 1),
-                "precipitation": round(2.1 + random.uniform(-1, 1), 1),
-                "surface_pressure": 1013.25,
-                "wind_speed_2m": round(3.5 + random.uniform(-2, 2), 1),
-                "coordinates": {"lat": lat, "lon": lon},
-                "timestamp": datetime.now().isoformat(),
-                "source": "NASA POWER API"
-            }
-        
-        async def get_satellite_imagery_metadata(self):
-            return {
-                "available_satellites": [
-                    {
-                        "name": "MODIS Terra",
-                        "description": "Moderate Resolution Imaging Spectroradiometer on Terra satellite",
-                        "resolution": "250m-1km",
-                        "bands": ["true_color", "false_color", "vegetation", "temperature"],
-                        "update_frequency": "daily"
-                    },
-                    {
-                        "name": "MODIS Aqua", 
-                        "description": "Moderate Resolution Imaging Spectroradiometer on Aqua satellite",
-                        "resolution": "250m-1km",
-                        "bands": ["true_color", "chlorophyll", "sea_surface_temp"],
-                        "update_frequency": "daily"
-                    },
-                    {
-                        "name": "VIIRS",
-                        "description": "Visible Infrared Imaging Radiometer Suite",
-                        "resolution": "375m-750m", 
-                        "bands": ["true_color", "night_lights", "cloud_cover"],
-                        "update_frequency": "daily"
-                    }
-                ],
-                "last_updated": datetime.now().isoformat()
-            }
-    
-    nasa_service = MockNasaService()
+app = FastAPI(
+    title="GaiaNet API",
+    description="Earth Environmental Data API",
+    version="1.0.0"
+)
 
-app = FastAPI(title="GaiaNet API", version="1.0.0")
-
-# CORS middleware - allow all origins for development
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -73,104 +20,52 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to GaiaNet API", "version": "1.0.0"}
+    return {"message": "GaiaNet API Server Running", "status": "healthy"}
 
 @app.get("/health")
-async def health():
+async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
-@app.get("/api/environment/data")
-async def get_environment_data():
-    # Simulate real environmental data with realistic values
+@app.get("/api/environment/current")
+async def get_current_environment():
+    """Get current environmental data"""
     return {
-        "temperature": {
-            "value": round(15.2 + random.uniform(-0.5, 0.5), 1),
-            "trend": "up",
-            "change": "+1.2°C"
-        },
-        "co2": {
-            "value": 417 + random.randint(-2, 2),
-            "trend": "up", 
-            "change": 52
-        },
-        "seaLevel": {
-            "value": round(3.2 + random.uniform(-0.2, 0.2), 1),
-            "trend": "up",
-            "change": "+0.8mm"
-        },
-        "forestCover": {
-            "value": round(31.2 + random.uniform(-0.5, 0.5), 1),
-            "trend": "down", 
-            "change": "-2.1%"
-        },
-        "biodiversity": {
-            "value": round(24.7 + random.uniform(-1, 1), 1),
-            "trend": "up",
-            "change": "+1.5%"
-        },
-        "iceCover": {
-            "value": round(12.8 + random.uniform(-1, 1), 1),
-            "trend": "down",
-            "change": "-3.2%"
-        },
-        "airQuality": {
-            "value": 85 + random.randint(-5, 5),
-            "trend": "down",
-            "change": "+5%"
-        }
+        "temperature": 15.2,
+        "co2_levels": 417.5,
+        "deforestation_rate": 0.08,
+        "biodiversity_index": 0.76,
+        "air_quality": 85.2,
+        "sea_level_rise": 3.4,
+        "timestamp": datetime.now().isoformat()
     }
 
-# NEW NASA ENDPOINTS
-@app.get("/api/nasa/imagery")
-async def get_nasa_imagery(lat: float = None, lon: float = None, date: str = None):
-    """Get NASA satellite imagery data"""
-    try:
-        imagery_data = await nasa_service.get_earth_imagery(lat, lon, date)
-        return {
-            "status": "success",
-            "data": imagery_data,
-            "message": "Satellite imagery data retrieved",
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to retrieve imagery: {str(e)}",
-            "timestamp": datetime.now().isoformat()
-        }
+@app.get("/api/environment/metrics")
+async def get_environment_metrics():
+    """Get environmental metrics with trends"""
+    return {
+        "metrics": {
+            "global_temperature": {"value": 15.2, "unit": "°C", "change": "+1.1", "trend": "rising"},
+            "co2_concentration": {"value": 417.5, "unit": "ppm", "change": "+2.5", "trend": "rising"},
+            "sea_level_rise": {"value": 3.4, "unit": "mm/year", "change": "+0.3", "trend": "rising"},
+            "forest_cover_loss": {"value": 10.1, "unit": "M hectares/year", "change": "-0.2", "trend": "improving"},
+            "biodiversity_index": {"value": 76.0, "unit": "%", "change": "-2.1", "trend": "declining"}
+        },
+        "last_updated": datetime.now().isoformat()
+    }
 
-@app.get("/api/nasa/climate")
-async def get_nasa_climate(lat: float = 0, lon: float = 0):
-    """Get NASA climate data for specific coordinates"""
-    try:
-        climate_data = await nasa_service.get_climate_data(lat, lon)
-        return {
-            "status": "success",
-            "data": climate_data,
-            "message": "Climate data retrieved",
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to retrieve climate data: {str(e)}",
-            "timestamp": datetime.now().isoformat()
-        }
+@app.get("/api/layers")
+async def get_available_layers():
+    """Get available data layers"""
+    return {
+        "layers": [
+            {"id": "temperature", "name": "Temperature Heatmap", "description": "Global temperature distribution"},
+            {"id": "vegetation", "name": "Vegetation Index", "description": "NDVI vegetation health"},
+            {"id": "co2", "name": "CO2 Concentration", "description": "Atmospheric CO2 levels"},
+            {"id": "deforestation", "name": "Deforestation", "description": "Forest cover changes"},
+            {"id": "night_lights", "name": "Night Lights", "description": "Human activity at night"}
+        ]
+    }
 
-@app.get("/api/nasa/satellites")
-async def get_satellite_metadata():
-    """Get metadata about available satellites"""
-    try:
-        metadata = await nasa_service.get_satellite_imagery_metadata()
-        return {
-            "status": "success",
-            "data": metadata,
-            "message": "Satellite metadata retrieved",
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to retrieve satellite metadata: {str(e)}",
-            "timestamp": datetime.now().isoformat()
-        }
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
