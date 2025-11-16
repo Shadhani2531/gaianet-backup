@@ -1,129 +1,163 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-const DataVisualization = ({ activeLayers = [], scene, earth }) => {
-  const groupRef = useRef();
+const DataVisualization = ({ activeLayers, environmentData, layerOpacities }) => {
+  const mountRef = useRef(null);
+  const sceneRef = useRef();
+  const dataLayersRef = useRef(new Map());
 
   useEffect(() => {
-    if (!scene || !groupRef.current) return;
+    if (!mountRef.current) return;
 
-    // Clear previous visualizations
-    while (groupRef.current.children.length > 0) {
-      groupRef.current.remove(groupRef.current.children[0]);
-    }
+    // Initialize Three.js scene for data visualization
+    const scene = new THREE.Scene();
+    sceneRef.current = scene;
 
-    // Add to scene if not already added
-    if (!scene.children.includes(groupRef.current)) {
-      scene.add(groupRef.current);
-    }
+    const renderer = new THREE.WebGLRenderer({ alpha: true });
+    renderer.setSize(300, 300);
+    mountRef.current.innerHTML = '';
+    mountRef.current.appendChild(renderer.domElement);
 
-    // Add data layers based on active layers
-    activeLayers.forEach(layer => {
-      switch (layer) {
-        case 'MODIS Terra':
-          addTemperatureHeatmap();
-          break;
-        case 'MODIS Aqua':
-          addVegetationLayer();
-          break;
-        case 'VIIRS':
-          addNightLightsLayer();
-          break;
-        default:
-          break;
-      }
-    });
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+    camera.position.z = 5;
 
-  }, [activeLayers, scene]);
-
-  const addTemperatureHeatmap = () => {
-    const geometry = new THREE.SphereGeometry(5.02, 64, 64);
-    const material = new THREE.ShaderMaterial({
-      transparent: true,
-      opacity: 0.6,
-      side: THREE.DoubleSide,
-      uniforms: {
-        time: { value: 0 }
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform float time;
-        varying vec2 vUv;
-        
-        void main() {
-          float temp = sin(vUv.x * 10.0 + time) * 0.5 + 0.5;
-          vec3 color = mix(vec3(0.0, 0.0, 1.0), vec3(1.0, 0.0, 0.0), temp);
-          float latitudeEffect = abs(vUv.y - 0.5) * 2.0;
-          color = mix(color, vec3(0.5), latitudeEffect * 0.3);
-          gl_FragColor = vec4(color, 0.3);
-        }
-      `
-    });
-
-    const heatmap = new THREE.Mesh(geometry, material);
-    groupRef.current.add(heatmap);
-
+    // Animation loop
     const animate = () => {
-      if (material.uniforms.time) {
-        material.uniforms.time.value += 0.01;
-        requestAnimationFrame(animate);
-      }
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
     };
     animate();
-  };
 
-  const addVegetationLayer = () => {
-    const geometry = new THREE.SphereGeometry(5.03, 64, 64);
-    const material = new THREE.MeshBasicMaterial({
-      color: 0x00ff00,
-      transparent: true,
-      opacity: 0.4,
-      side: THREE.DoubleSide
+    return () => {
+      renderer.dispose();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sceneRef.current) return;
+
+    // Clear previous layers
+    dataLayersRef.current.forEach(layer => {
+      sceneRef.current.remove(layer);
+    });
+    dataLayersRef.current.clear();
+
+    // Add new visualization layers
+    activeLayers.forEach(layer => {
+      const visualization = createDataVisualization(layer, environmentData, layerOpacities[layer]);
+      if (visualization) {
+        sceneRef.current.add(visualization);
+        dataLayersRef.current.set(layer, visualization);
+      }
     });
 
-    const vegetation = new THREE.Mesh(geometry, material);
-    groupRef.current.add(vegetation);
+  }, [activeLayers, environmentData, layerOpacities]);
+
+  const createDataVisualization = (layer, data, opacity) => {
+    switch (layer) {
+      case 'temperature':
+        return createTemperatureViz(data, opacity);
+      case 'co2':
+        return createCO2Viz(data, opacity);
+      case 'vegetation':
+        return createVegetationViz(data, opacity);
+      default:
+        return null;
+    }
   };
 
-  const addNightLightsLayer = () => {
-    const geometry = new THREE.SphereGeometry(5.01, 128, 128);
-    const lightsPositions = [];
-    const lightsColors = [];
+  const createTemperatureViz = (data, opacity) => {
+    const temp = data?.temperature?.global_average || 15;
+    const anomaly = data?.temperature?.anomaly || 0;
     
-    for (let i = 0; i < 500; i++) {
-      const phi = Math.acos(-1 + Math.random() * 2);
-      const theta = Math.random() * Math.PI * 2;
-      
-      const x = 5.01 * Math.sin(phi) * Math.cos(theta);
-      const y = 5.01 * Math.sin(phi) * Math.sin(theta);
-      const z = 5.01 * Math.cos(phi);
-      
-      lightsPositions.push(x, y, z);
-      lightsColors.push(1, 1, 0.8);
+    // Create temperature gradient visualization
+    const geometry = new THREE.SphereGeometry(1, 32, 32);
+    const material = new THREE.MeshBasicMaterial({
+      color: new THREE.Color().setHSL(0.6 - (temp / 30), 0.8, 0.5),
+      transparent: true,
+      opacity: opacity
+    });
+    
+    return new THREE.Mesh(geometry, material);
+  };
+
+  const createCO2Viz = (data, opacity) => {
+    const co2 = data?.co2?.value || 417;
+    const intensity = Math.min(1, (co2 - 300) / 200);
+    
+    const group = new THREE.Group();
+    
+    // CO2 molecule-like visualization
+    const centerGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+    const centerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff6600,
+      transparent: true,
+      opacity: opacity * intensity
+    });
+    const center = new THREE.Mesh(centerGeometry, centerMaterial);
+    group.add(center);
+    
+    // Surrounding particles
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const particleGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+      const particleMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff8800,
+        transparent: true,
+        opacity: opacity * 0.7
+      });
+      const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+      particle.position.set(Math.cos(angle) * 1.2, Math.sin(angle) * 1.2, 0);
+      group.add(particle);
     }
     
-    const lightsGeometry = new THREE.BufferGeometry();
-    lightsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(lightsPositions, 3));
-    lightsGeometry.setAttribute('color', new THREE.Float32BufferAttribute(lightsColors, 3));
-    
-    const lightsMaterial = new THREE.PointsMaterial({
-      size: 0.1,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.8
-    });
-    
-    const nightLights = new THREE.Points(lightsGeometry, lightsMaterial);
-    groupRef.current.add(nightLights);
+    return group;
   };
 
-  return <group ref={groupRef} />;
+  const createVegetationViz = (data, opacity) => {
+    const ndvi = data?.vegetation?.ndvi_global || 0.4;
+    const health = data?.vegetation?.health_index || 75;
+    
+    const group = new THREE.Group();
+    
+    // Tree-like visualization
+    const trunkGeometry = new THREE.CylinderGeometry(0.1, 0.15, 1, 8);
+    const trunkMaterial = new THREE.MeshBasicMaterial({
+      color: 0x8B4513,
+      transparent: true,
+      opacity: opacity
+    });
+    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+    group.add(trunk);
+    
+    // Canopy based on vegetation health
+    const canopyGeometry = new THREE.SphereGeometry(0.6, 16, 16);
+    const canopyMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color().setHSL(0.3, 0.8, 0.3 + (health / 200)),
+      transparent: true,
+      opacity: opacity * 0.8
+    });
+    const canopy = new THREE.Mesh(canopyGeometry, canopyMaterial);
+    canopy.position.y = 0.8;
+    group.add(canopy);
+    
+    return group;
+  };
+
+  return (
+    <div className="data-visualization">
+      <h3>Data Visualization</h3>
+      <div ref={mountRef} className="viz-canvas"></div>
+      <div className="viz-legend">
+        {activeLayers.map(layer => (
+          <div key={layer} className="legend-item">
+            <span className="legend-color"></span>
+            <span className="legend-label">{layer}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 export default DataVisualization;

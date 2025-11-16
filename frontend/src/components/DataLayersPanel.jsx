@@ -157,5 +157,13 @@ const DataLayersPanel = ({ activeLayers, onLayersChange, layerOpacities, onOpaci
     </div>
   );
 };
-
+// Add this to your layer items to show real values:
+{environmentData && (
+  <div className="layer-value" style={{ fontSize: '0.8em', color: '#88aacc', marginTop: '5px' }}>
+    {layer.id === 'temperature' && `Current: ${environmentData.temperature?.global_average}°C`}
+    {layer.id === 'vegetation' && `Health: ${environmentData.vegetation?.health_index}/100`}
+    {layer.id === 'co2' && `Level: ${environmentData.co2?.value} ppm`}
+    {layer.id === 'air_quality' && `Quality: ${weatherData?.alerts?.air_quality || 'moderate'}`}
+  </div>
+)}
 export default DataLayersPanel;

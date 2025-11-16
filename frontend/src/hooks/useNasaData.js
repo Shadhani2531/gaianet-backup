@@ -65,3 +65,12 @@ export const useNasaData = () => {
     refetchMetadata: fetchSatelliteMetadata,
   };
 };
+return{
+  satelliteMetadata,
+  climateDATA,
+  imageryData,
+  loading,
+  error,
+  fetchiClimateData,
+  fetch
+}

@@ -1,69 +1,75 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from datetime import datetime
-from typing import Dict, Any
+import asyncio
+from nasa_client import NASAClient
+from data_models import EnvironmentalData, NASAImagery, WeatherData
 
-app = FastAPI(
-    title="GaiaNet API",
-    description="Earth Environmental Data API",
-    version="1.0.0"
-)
+app = FastAPI(title="GaiaNet API", version="1.0.0")
 
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Vite default
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Initialize NASA client
+nasa_client = NASAClient()
+
 @app.get("/")
 async def root():
-    return {"message": "GaiaNet API Server Running", "status": "healthy"}
+    return {
+        "message": "GaiaNet Planetary Intelligence API",
+        "status": "operational",
+        "version": "1.0.0",
+        "timestamp": datetime.now().isoformat()
+    }
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
-@app.get("/api/environment/current")
-async def get_current_environment():
-    """Get current environmental data"""
-    return {
-        "temperature": 15.2,
-        "co2_levels": 417.5,
-        "deforestation_rate": 0.08,
-        "biodiversity_index": 0.76,
-        "air_quality": 85.2,
-        "sea_level_rise": 3.4,
-        "timestamp": datetime.now().isoformat()
-    }
+@app.get("/api/environment/data")
+async def get_environmental_data():
+    """Get comprehensive environmental data"""
+    try:
+        data = await nasa_client.get_environmental_data()
+        return JSONResponse(content=data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching environmental data: {str(e)}")
 
-@app.get("/api/environment/metrics")
-async def get_environment_metrics():
-    """Get environmental metrics with trends"""
-    return {
-        "metrics": {
-            "global_temperature": {"value": 15.2, "unit": "°C", "change": "+1.1", "trend": "rising"},
-            "co2_concentration": {"value": 417.5, "unit": "ppm", "change": "+2.5", "trend": "rising"},
-            "sea_level_rise": {"value": 3.4, "unit": "mm/year", "change": "+0.3", "trend": "rising"},
-            "forest_cover_loss": {"value": 10.1, "unit": "M hectares/year", "change": "-0.2", "trend": "improving"},
-            "biodiversity_index": {"value": 76.0, "unit": "%", "change": "-2.1", "trend": "declining"}
-        },
-        "last_updated": datetime.now().isoformat()
-    }
+@app.get("/api/nasa/imagery")
+async def get_nasa_imagery(lat: float = 40.7128, lon: float = -74.0060, date: str = None):
+    """Get NASA Earth imagery"""
+    try:
+        imagery_data = await nasa_client.get_earth_imagery(lat, lon, date)
+        return JSONResponse(content=imagery_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching NASA imagery: {str(e)}")
 
-@app.get("/api/layers")
-async def get_available_layers():
-    """Get available data layers"""
+@app.get("/api/nasa/weather")
+async def get_weather_data():
+    """Get weather and climate data"""
+    try:
+        weather_data = await nasa_client.get_weather_data()
+        return JSONResponse(content=weather_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching weather data: {str(e)}")
+
+@app.get("/api/gaianet/status")
+async def get_gaianet_status():
+    """Get GaiaNet system status"""
     return {
-        "layers": [
-            {"id": "temperature", "name": "Temperature Heatmap", "description": "Global temperature distribution"},
-            {"id": "vegetation", "name": "Vegetation Index", "description": "NDVI vegetation health"},
-            {"id": "co2", "name": "CO2 Concentration", "description": "Atmospheric CO2 levels"},
-            {"id": "deforestation", "name": "Deforestation", "description": "Forest cover changes"},
-            {"id": "night_lights", "name": "Night Lights", "description": "Human activity at night"}
-        ]
+        "system": "GaiaNet Planetary Intelligence",
+        "status": "operational",
+        "earth_visualization": "active",
+        "data_streams": ["environmental", "imagery", "weather"],
+        "last_data_update": datetime.now().isoformat(),
+        "version": "1.0.0"
     }
 
 if __name__ == "__main__":
